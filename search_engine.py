@@ -1,6 +1,8 @@
 import sqlite3
 import json
 import chromadb
+import os
+import streamlit as st
 from openai import OpenAI
 from pydantic import BaseModel
 from typing import Optional
@@ -8,7 +10,7 @@ from datetime import datetime
 
 # Initialize clients
 client = OpenAI(
-    api_key="sk-air-v1-d6d0a428d331befa59f5117be004d29fca6b38aca3cc008bc7f13de879aa367b",                # your AIRouter API key
+    api_key=st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY")),                # your AIRouter API key
     base_url="https://api.airouter.in/v1",  # AIRouter's OpenAI-compatible endpoint
 )
 chroma_client = chromadb.PersistentClient(path="./db/chroma_data")
