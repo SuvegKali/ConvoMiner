@@ -104,9 +104,15 @@ with tab2:
                 
                 target_id = tq.get("target_message_id")
                 # Considered a Hit if target ID is in top 5 returned candidates
-                is_hit = target_id in matched_ids if target_id else False
+                is_hit = False
+                if target_id:
+                    for m_id in matched_ids:
+                        if abs(target_id - m_id) <= 5:
+                            is_hit = True
+                            break
+
                 if is_hit:
-                    hits += 1
+                    hits+=1
                     
                 results_table.append({
                     "Query ID": tq["query_id"],

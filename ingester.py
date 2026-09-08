@@ -3,6 +3,7 @@ import sqlite3
 import os
 import chromadb
 from openai import OpenAI
+from datetime import datetime
 
 # Initialize clients
 client = OpenAI(
@@ -12,6 +13,14 @@ client = OpenAI(
 chroma_client = chromadb.PersistentClient(path="./db/chroma_data")
 
 DB_PATH = "./db/chat.db"
+
+def parse_iso_to_epoch(iso_str: str) -> int:
+    """Converts ISO timestamp string to integer Unix epoch seconds."""
+    try:
+        clean_str = iso_str.replace("Z", "+00:00")
+        return int(datetime.fromisoformat(clean_str).timestamp())
+    except Exception:
+        return 0
 
 def init_sqlite():
     """Sets up SQLite database with clean table structure."""
@@ -94,7 +103,8 @@ def ingest_dataset(json_file_path):
             {
                 "message_id": m["id"],
                 "sender_name": m["sender_name"],
-                "timestamp": m["timestamp"]
+                "timestamp": m["timestamp"],
+                "timestamp_epoch": parse_iso_to_epoch(m["timestamp"])  # <--- Integer timestamp
             }
             for m in batch
         ]
@@ -124,3 +134,4 @@ def ingest_dataset(json_file_path):
 
 if __name__ == "__main__":
     ingest_dataset("datasets/dataset_1.json")
+    

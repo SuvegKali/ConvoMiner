@@ -4,6 +4,7 @@ import chromadb
 from openai import OpenAI
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 
 # Initialize clients
 client = OpenAI(
@@ -21,6 +22,19 @@ class ParsedQuery(BaseModel):
     start_date: Optional[str] = None  # ISO format string YYYY-MM-DD
     end_date: Optional[str] = None    # ISO format string YYYY-MM-DD
 
+def parse_date_to_epoch(date_str: Optional[str], is_end_of_day: bool = False) -> Optional[int]:
+    """Safely parses string date to Unix epoch integer, returning None if invalid or null."""
+    if not date_str or str(date_str).lower() == "null":
+        return None
+    try:
+        # Handle YYYY-MM-DD
+        if len(date_str) == 10:
+            date_str += "T23:59:59" if is_end_of_day else "T00:00:00"
+        clean_str = date_str.replace("Z", "+00:00")
+        return int(datetime.fromisoformat(clean_str).timestamp())
+    except Exception:
+        return None
+
 def parse_query_intent(user_query: str) -> ParsedQuery:
     """Uses LLM structured output to extract metadata filters and query keywords."""
     system_prompt = """
@@ -28,7 +42,7 @@ def parse_query_intent(user_query: str) -> ParsedQuery:
     Extract the following from the user's natural language search query:
     1. semantic_query: Cleaned topic/keywords stripped of sender names or relative temporal words. Translate Hinglish concepts if necessary for better semantic search.
     2. sender_filter: Exact sender name mentioned (e.g. 'Priya', 'Rohan', 'Kabir') or null.
-    3. start_date / end_date: Strictly format as YYYY-MM-DD or null if no temporal constraint is mentioned. Assume current date is 2026-09-01.
+    3. start_date / end_date: Strictly format as YYYY-MM-DD or null. ONLY populate dates if the user explicitly specifies a timeframe (e.g., 'in March', 'last week', 'yesterday'). Do NOT infer date filters just because the query contains question words like 'when' or 'what'.
 
     Output pure JSON matching the requested schema.
     """
@@ -61,32 +75,37 @@ def fetch_conversation_window(target_msg_id: int, window: int = 5) -> list:
     return rows
 
 def execute_search(user_query: str, top_k: int = 3):
-    # Step 1: Parse intent
     parsed = parse_query_intent(user_query)
-    print(f"Parsed Router Intent: {parsed}")
-
-    # Step 2: Build ChromaDB metadata filter
+    
     where_conditions = []
-    if parsed.sender_filter:
+    
+    # 1. Sender filter
+    if parsed.sender_filter and str(parsed.sender_filter).lower() != "null":
         where_conditions.append({"sender_name": {"$eq": parsed.sender_filter}})
-    if parsed.start_date:
-        where_conditions.append({"timestamp": {"$gte": parsed.start_date}})
-    if parsed.end_date:
-        where_conditions.append({"timestamp": {"$lte": parsed.end_date}})
+        
+    # 2. Start date filter (Epoch Integer)
+    start_epoch = parse_date_to_epoch(parsed.start_date, is_end_of_day=False)
+    if start_epoch is not None:
+        where_conditions.append({"timestamp_epoch": {"$gte": start_epoch}})
+        
+    # 3. End date filter (Epoch Integer)
+    end_epoch = parse_date_to_epoch(parsed.end_date, is_end_of_day=True)
+    if end_epoch is not None:
+        where_conditions.append({"timestamp_epoch": {"$lte": end_epoch}})
 
+    # Format for ChromaDB
     chroma_where = None
     if len(where_conditions) == 1:
         chroma_where = where_conditions[0]
     elif len(where_conditions) > 1:
         chroma_where = {"$and": where_conditions}
 
-    # Step 3: Embed the cleaned semantic string
+    # Embed and search
     query_embedding = client.embeddings.create(
         input=[parsed.semantic_query],
         model="openai/text-embedding-3-small"
     ).data[0].embedding
 
-    # Step 4: Query ChromaDB
     results = collection.query(
         query_embeddings=[query_embedding],
         n_results=top_k,
