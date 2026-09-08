@@ -106,11 +106,13 @@ def assemble_dataset():
             
         thread = generate_anchor_thread(info)
         decision_id = None
-        
+        actual_sender = None
+    
         for item in thread:
             participant = next((p for p in PARTICIPANTS if p['name'] == item['sender']), PARTICIPANTS[0])
             if info["decision"].lower() in item["content"].lower():
                 decision_id = msg_id
+                actual_sender = participant["name"]
             
             messages.append({
                 "id": msg_id, "sender_id": participant["id"], "sender_name": participant["name"],
@@ -119,14 +121,21 @@ def assemble_dataset():
             current_time += timedelta(seconds=random.randint(10, 180))
             msg_id += 1
 
+        # Fallback if text matching failed to find the decision line
         if not decision_id:
             decision_id = target_pos + 5
+            actual_sender = PARTICIPANTS[0]["name"]
 
+        # Append queries OUTSIDE the 'if not decision_id' check
         for q in info["queries"]:
+            query_text = q["query"]
+            if q["type"] == "attributed" and "{sender}" in query_text:
+                query_text = query_text.format(sender=actual_sender)
+                
             test_queries.append({
                 "query_id": f"q{len(test_queries) + 1}",
                 "type": q["type"],
-                "query": q["query"],
+                "query": query_text,
                 "target_message_id": decision_id
             })
 
@@ -140,7 +149,7 @@ def assemble_dataset():
         current_time += timedelta(seconds=random.randint(15, 3600))
         msg_id += 1
 
-    # Duplicate anchor queries to reach 40 test cases without random filler query noise
+    # Duplicate anchor queries to reach 40 test cases
     base_queries = list(test_queries)
     while len(test_queries) < 40:
         ref = base_queries[len(test_queries) % len(base_queries)]
@@ -154,6 +163,5 @@ def assemble_dataset():
     os.makedirs("datasets", exist_ok=True)
     with open("datasets/dataset_1.json", "w", encoding="utf-8") as f:
         json.dump({"messages": messages, "test_queries": test_queries}, f, ensure_ascii=False, indent=2)
-
 if __name__ == "__main__":
     assemble_dataset()

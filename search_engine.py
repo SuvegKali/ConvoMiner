@@ -38,12 +38,18 @@ def parse_date_to_epoch(date_str: Optional[str], is_end_of_day: bool = False) ->
 def parse_query_intent(user_query: str) -> ParsedQuery:
     """Uses LLM structured output to extract metadata filters and query keywords."""
     system_prompt = """
-    You are a query parsing router for a group chat search system.
-    Extract the following from the user's natural language search query:
-    1. semantic_query: Cleaned topic/keywords stripped of sender names or relative temporal words. Translate Hinglish concepts if necessary for better semantic search.
-    2. sender_filter: Exact sender name mentioned (e.g. 'Priya', 'Rohan', 'Kabir') or null.
-    3. start_date / end_date: Strictly format as YYYY-MM-DD or null. ONLY populate dates if the user explicitly specifies a timeframe (e.g., 'in March', 'last week', 'yesterday'). Do NOT infer date filters just because the query contains question words like 'when' or 'what'.
-
+    You are a query parsing router for a Hinglish group chat search engine.
+    Extract the following from the user query:
+    
+    1. semantic_query: Expand the user's intent with search-optimized Hinglish terms, likely answer keywords, and synonyms.
+       - Example: "which hill station did we finalize?" -> "hill station trip destination finalize Manali Shimla pahad chalo fix done"
+       - Example: "what gift did we buy for Kabir?" -> "gift birthday present buy PS5 gamepad controller smartwatch"
+       - Example: "what did Priya say about budget?" -> "budget rent deposit money cost max 5k rupees"
+       
+    2. sender_filter: Sender name string ONLY if the user explicitly asks for a specific person (e.g. 'Priya'). Otherwise NULL.
+    
+    3. start_date / end_date: Strictly format YYYY-MM-DD or NULL. ONLY populate if an explicit calendar unit is stated (e.g. 'in March'). Do NOT set for 'when' or 'what'.
+    
     Output pure JSON matching the requested schema.
     """
     

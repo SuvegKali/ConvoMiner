@@ -111,7 +111,7 @@ def ingest_dataset(json_file_path):
         
         # Build contextual text strings for embedding
         documents = [
-            get_contextual_text(messages, i + idx, window_size=2)
+            get_contextual_text(messages, i + idx, window_size=4)
             for idx, m in enumerate(batch)
         ]
 
