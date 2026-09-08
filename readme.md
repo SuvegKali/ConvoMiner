@@ -1,6 +1,7 @@
 
 # ConvoMiner: Context-Aware Code-Mixed Group Chat Search
 
+## Live Demo link : https://convominer.streamlit.app/
 ConvoMiner is a context-aware search engine designed to parse multi-party conversational group chats. Traditional keyword-based search fails when users search by intent or concept rather than exact phrasing—especially in code-mixed languages (such as Hinglish) where slang, transliteration, and single-word replies are common.
 
 ConvoMiner addresses this by decoupling query intent parsing, vector similarity retrieval, and sequential context reconstruction.
